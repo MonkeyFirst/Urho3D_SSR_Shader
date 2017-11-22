@@ -17,7 +17,7 @@ uniform vec2 cSSRHInvSize;
 
 vec3 GetViewFarRaySS(vec2 ss) 
 {
-  vec4 cameraRay = vec4(ss.xy * vec2(2.0,2.0) - vec2(1.0, 1.0), 1.0, 1.0);
+  vec4 cameraRay = vec4(ss.xy * vec2(2.0, 2.0) - vec2(1.0, 1.0), 1.0, 1.0);
   cameraRay = cameraRay * cProjInv;
   cameraRay.xyz = cameraRay.xyz / cameraRay.w;
   return cameraRay.xyz;
@@ -37,6 +37,14 @@ void VS()
 }
 
 #ifdef COMPILEPS
+
+vec3 GetViewFarRaySSPS(vec2 ss) 
+{
+  vec4 cameraRay = vec4(ss.xy * vec2(2.0,2.0) - vec2(1.0, 1.0), 1.0, 1.0);
+  cameraRay = cameraRay * cProjInvPS;
+  cameraRay.xyz = cameraRay.xyz / cameraRay.w;
+  return cameraRay.xyz;
+}
 
 vec2 GetScreenPosPreDivPS(vec4 clipPos)
 {
@@ -91,8 +99,8 @@ vec3 BinarySearch(inout vec3 dir, inout vec3 hitCoord, inout float dDepth)
             float depth = DecodeDepth(texture2D(sDepthBuffer, projectedCoord.xy).rgb);
         #endif
         
-        vec3 viewPos = GetViewPosition(projectedCoord.xy, depth);
-        //vec3 viewPos = vViewFarRay * depth;
+        //vec3 viewPos = GetViewPosition(projectedCoord.xy, depth);
+        vec3 viewPos = vViewFarRay * -depth;
         dDepth = hitCoord.z - viewPos.z;
 
         dir *= 0.5;
@@ -108,7 +116,7 @@ vec3 BinarySearch(inout vec3 dir, inout vec3 hitCoord, inout float dDepth)
     //projectedCoord.xy = projectedCoord.xy * 0.5 + 0.5;
     projectedCoord.xy = GetScreenPosPreDivPS(projectedCoord);
  
-    return vec3(projectedCoord.xy, depth);
+    return vec3(projectedCoord.xy, -depth);
 }
 
 vec4 RayMarch(vec3 dir, inout vec3 hitCoord, inout float dDepth)
@@ -137,11 +145,11 @@ vec4 RayMarch(vec3 dir, inout vec3 hitCoord, inout float dDepth)
         
         // Convert ScreenSpace position to ViewSpace position
         //vec3 viewPos = GetViewPosition(projectedCoord.xy, depth);
-        vec3 viewPos = vViewFarRay * SampledDepth;
+        vec3 viewPos = vViewFarRay * -SampledDepth;
         depth = viewPos.z;
         
         // ≈сли позици€ слишком далеко от камеры
-        if(depth > 1000)
+        if(depth > 0)
             continue;
         
         
@@ -149,7 +157,7 @@ vec4 RayMarch(vec3 dir, inout vec3 hitCoord, inout float dDepth)
             
         //if((dir.z - dDepth) < 1.0)
         {
-            if(fDepthDiff >= 0.0)
+            if(fDepthDiff <= 0.0)
             {   
                 vec4 Result;
                 Result = vec4(BinarySearch(dir, hitCoord, fDepthDiff), 1.0);
@@ -187,10 +195,10 @@ void PS()
     //vec3 viewPos = GetViewPosition(vScreenPos, depth);
     
     // Restore view position
-    vec3 viewPos = vViewFarRay * depth;
+    vec3 viewPos = vViewFarRay * -depth;
     
     // Restore world position
-    vec3 worldPos = vFarRay * depth; // wp used for generate jitt function
+    vec3 worldPos = vFarRay * -depth; // wp used for generate jitt function
     
     // Transform world normal into view normal
     vec3 viewNormal = normalize(cViewTransposedPS * normal);
@@ -206,11 +214,11 @@ void PS()
     
     //vec4 coords = RayMarch(reflected * max(minRayStep, -viewPos.z), hitPos, dDepth);
     
-    vec4 coords = RayMarch( reflected, hitPos, dDepth); // clean mirror
-    //vec4 coords = RayMarch( jitt + reflected, hitPos, dDepth); // dirty mirror with jitt
+    //vec4 coords = RayMarch(reflected, hitPos, dDepth); // clean mirror
+    vec4 coords = RayMarch( jitt + reflected, hitPos, dDepth); // dirty mirror with jitt
     
     // Use fresnel function to kill "lost information" on front-faced surfaces to camera  
-    float fresnel = clamp(pow(1 - dot(-1 * normalize(viewPos), viewNormal), 2), 0, 1);
+    float fresnel = clamp(pow(1 - dot(normalize(viewPos), viewNormal), 1), 0, 1);
     
     // read reflected color from current frame
     vec3 reflectionColor = texture2D(sDiffMap, coords.xy, 0).rgb;
