@@ -730,6 +730,7 @@ void View::SetCameraShaderParameters(Camera* camera)
     graphics_->SetShaderParameter(VSP_VIEW, camera->GetView());
     graphics_->SetShaderParameter(PSP_CAMERAPOS, cameraEffectiveTransform.Translation());
 
+
     float nearClip = camera->GetNearClip();
     float farClip = camera->GetFarClip();
     graphics_->SetShaderParameter(VSP_NEARCLIP, nearClip);
@@ -752,6 +753,8 @@ void View::SetCameraShaderParameters(Camera* camera)
         depthMode.w_ = 1.0f / camera->GetFarClip();
 
     graphics_->SetShaderParameter(VSP_DEPTHMODE, depthMode);
+	graphics_->SetShaderParameter(PSP_DEPTHMODE, depthMode);
+
 
     Vector4 depthReconstruct
         (farClip / (farClip - nearClip), -nearClip / (farClip - nearClip), camera->IsOrthographic() ? 1.0f : 0.0f,
@@ -761,6 +764,8 @@ void View::SetCameraShaderParameters(Camera* camera)
     Vector3 nearVector, farVector;
     camera->GetFrustumSize(nearVector, farVector);
     graphics_->SetShaderParameter(VSP_FRUSTUMSIZE, farVector);
+	graphics_->SetShaderParameter(PSP_FRUSTUMSIZE, farVector);
+
 
     Matrix4 projection = camera->GetGPUProjection();
 #ifdef URHO3D_OPENGL
@@ -771,6 +776,45 @@ void View::SetCameraShaderParameters(Camera* camera)
 #endif
 
     graphics_->SetShaderParameter(VSP_VIEWPROJ, projection * camera->GetView());
+
+#ifdef URHO3D_OPENGL
+	//Matrix4 proj = camera->GetGPUProjection();
+	// OpenGL case
+	Vector4 projInfo = Vector4(	2.0f / projection.m00_,
+								2.0f / projection.m11_,
+								-(1.0f + projection.m02_) / projection.m00_,
+								-(1.0f + projection.m12_) / projection.m11_);
+
+	Matrix3x4 viewProjInv = (projection * camera->GetView()).Inverse();
+
+#else
+	//DX case
+	//Vector4 projInfo = new Vector4
+	//((-2.0f / (Screen.width * P[0])),
+	//	(-2.0f / (Screen.height * P[5])),
+	//	((1.0f - P[2]) / P[0]),
+	//	((1.0f + P[6]) / P[5]));
+
+#endif
+	graphics_->SetShaderParameter(PSP_PROJINFO, projInfo);
+	graphics_->SetShaderParameter(PSP_VIEWPROJINV, viewProjInv);
+	Matrix3 viewTransposed = camera->GetView().ToMatrix3();
+	viewTransposed = viewTransposed.Transpose();
+	graphics_->SetShaderParameter(PSP_VIEWTRANSPOSED, viewTransposed);
+	
+	graphics_->SetShaderParameter(PSP_PROJ, projection);
+	graphics_->SetShaderParameter(VSP_PROJ, projection);
+
+	graphics_->SetShaderParameter(PSP_VIEV, camera->GetView());
+	graphics_->SetShaderParameter(PSP_VIEVPROJ, projection * camera->GetView());
+	
+	graphics_->SetShaderParameter(PSP_PROJINV, projection.Inverse());
+	graphics_->SetShaderParameter(VSP_PROJINV, projection.Inverse());
+
+	graphics_->SetShaderParameter(PSP_VIEVINV, cameraEffectiveTransform);
+
+
+
 
     // If in a scene pass and the command defines shader parameters, set them now
     if (passCommand_)
@@ -800,6 +844,7 @@ void View::SetGBufferShaderParameters(const IntVector2& texSize, const IntRect& 
         (pixelUVOffset.y_ + (float)viewRect.top_) / texHeight + heightRange, widthRange, heightRange);
 #endif
     graphics_->SetShaderParameter(VSP_GBUFFEROFFSETS, bufferUVOffset);
+	graphics_->SetShaderParameter(PSP_GBUFFEROFFSETS, bufferUVOffset);
 
     float invSizeX = 1.0f / texWidth;
     float invSizeY = 1.0f / texHeight;
