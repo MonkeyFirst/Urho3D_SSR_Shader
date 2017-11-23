@@ -13,7 +13,7 @@ varying vec3 vViewFarRay;
 const float cSSRStep = 0.5;                    // default = 0.5, for large view distances need increase step                   
 const int cSSRMaxSteps = 32;                  // default = 32
 const int cSSRNumBinarySearchSteps = 16;      // default = 16  
-const float cSSRReflectionFalloff = 0.1;       // 0...1.0
+const float cSSRReflectionFalloff = 0.01;       // 0...1.0
 const float cSSRClipSSRDistance = 200;         // distance from camera to clip plane
 #endif
 
@@ -210,7 +210,7 @@ void PS()
     // read reflected color from current frame
     vec3 reflectionColor = texture2D(sDiffMap, coords.xy, 0).rgb;
     
-    vec2 dCoords = smoothstep(0.3, 0.6, abs(vec2(0.5, 0.5) - coords.xy));
+    vec2 dCoords = smoothstep(0.3, 0.6, abs(vec2(0.5, 0.5) - vScreenPos.xy));
     
     float screenEdgeFactor = clamp(1.0 - (dCoords.x + dCoords.y), 0.0, 1.0);
     
@@ -222,12 +222,12 @@ void PS()
     //vec3 ssrTint = vec3(0.5, 0.5, 1.0);
     //gl_FragColor = vec4(albedo + (reflectionColor * ssr * fresnel * ssrTint), specIntensity);
     
-    gl_FragColor = vec4(albedo + (reflectionColor * clamp(reflectionMultiplier, 0.0, 1.0) * fresnel), specIntensity);
+    gl_FragColor = vec4(albedo + (reflectionColor * clamp(reflectionMultiplier, 0.0, 0.9) * fresnel), specIntensity);
     
     #else // DEBUG
-    //gl_FragColor = vec4(reflectionMultiplier * fresnel,1);
-    //gl_FragColor = vec4(screenEdgefactor,screenEdgefactor,screenEdgefactor, 1); 
-    //gl_FragColor = vec4(dCoords,1, 1);
+    gl_FragColor = vec4(reflectionMultiplier * fresnel,1);
+    //gl_FragColor = vec4(screenEdgeFactor,screenEdgeFactor,screenEdgeFactor, 1); 
+    //gl_FragColor = vec4(dCoords,0, 1);
     //gl_FragColor = vec4(fresnel, 1);
     //gl_FragColor = vec4(albedo, 1);
     //gl_FragColor = vec4(viewPos, 1.0);
